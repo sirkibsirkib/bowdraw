@@ -54,6 +54,7 @@ impl DrawState {
 }
 
 const DESIRED_UPS: u32 = 60;
+const GRAVITY: f32 = 0.5;
 // const DESIRED_FPS: u32 = 60;
 
 
@@ -208,7 +209,7 @@ impl GameState {
                 self.dead_arrows.add(param);
             } else {
                 arrow.position = add_pts(arrow.position, arrow.momentum);
-                arrow.climb_momentum -= 0.25;//(-1.0_f32).max(arrow.climb_momentum-0.1);
+                arrow.climb_momentum -= GRAVITY;//(-1.0_f32).max(arrow.climb_momentum-0.1);
             }
         }
         for index in self.temp_usize.drain(..).rev() {
@@ -251,6 +252,11 @@ fn calc_rotation(pt: Point2) -> f32 {
 
 fn scale_pt(p: Point2, scalar: f32) -> Point2 {
     Point2::new(p[0]*scalar, p[1]*scalar)
+}
+
+fn shoot_get_1d_velocity(distance: f32, theta: f32) -> f32 {
+    let x = distance * GRAVITY / (theta * 2.0).sin();
+    x.sqrt()
 }
 
 impl event::EventHandler for GameState {
@@ -303,18 +309,44 @@ impl event::EventHandler for GameState {
                 let len_ye = dist(pt_y, end);   
                 println!("Loosed arrow!. on:{} ne:{} oe:{} xn:{}", len_on, len_ne, len_oe, len_xn);
                 let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
-                let pitch = 3.0 * turnaround_index as f32 / self.mouse_pts.len() as f32;
-                let speed = (0.03 * len_on) / (len_oe + len_on + 1.0);
-                println!("power:{} pitch:{} speed:{}", power, pitch, speed);
+                let l = self.mouse_pts.len() as f32;
+
+                let umph = 30.0 * len_ne / (len_oe + len_ne + len_on) ;
+                let t = turnaround_index as f32;
+
+                let theta = (std::f32::consts::PI * 0.5)
+                / (1.0 + 5.0*(
+                    (t / len_on) / ((l-t) / len_ne)
+                ));
+
+                let pitch = umph * theta.sin();
+                let speed = umph * theta.cos();
+                println!("umph:{}\tspeed:{}\ttheta:{}", umph, speed, theta);
+                let mom = Point2::new(
+                    speed * (nock[0] - end[0]) / len_ne,
+                    speed * (nock[1] - end[1]) / len_ne,
+                );
+
+                // println!("power:{} pitch:{} speed:{}", power, pitch, speed);
+                // let mom = scale_pt(Point2::new(nock[0] - end[0], nock[1] - end[1]), speed);
+
+
+                // let dx = (end[0] - self.character_at[0]).abs();
+                // //let dy = (end[1] - self.character_at[1]).abs();
+                // let angle = 0.4;
+                // let tot_speed = shoot_get_1d_velocity(dx, angle);
+                // let mom = Point2::new(tot_speed*angle.cos(), 0.);
+                // let pitch = tot_speed*angle.sin();
+
+
                 
-                let mom = scale_pt(Point2::new(nock[0] - end[0], nock[1] - end[1]), speed);
                 println!("ANGLE IS {}", calc_rotation(mom));
                 let new_arrow = LiveArrow {
                     position: self.character_at,
                     momentum: mom,
                     angle: calc_rotation(mom),
                     height: 10.0,
-                    climb_momentum: pitch*3.0, 
+                    climb_momentum: pitch, 
                 };
                 self.live_arrows.push(new_arrow);
             }
