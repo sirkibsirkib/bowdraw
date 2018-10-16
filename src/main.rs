@@ -1,89 +1,54 @@
-
-extern crate ggez;
 extern crate fnv;
+extern crate ggez;
 extern crate rand;
 
 mod consts;
-use ::consts::*;
+use consts::*;
+
+use std::f32::consts::PI;
 
 mod arrow;
 mod utils;
-use ::utils::{
-    pt,
-};
 use arrow::LiveArrow;
+use utils::PointArithmetic;
 
-use std::{
-	// thread,
-	// time,
-	path,
-	env,
-};
 use ggez::{
-    Context,
-    GameResult,
     conf,
-    timer,
+    event::{self, Keycode, Mod, MouseButton, MouseState},
     graphics::{
-        self,
-        Color,
-        DrawMode,
-        Point2,
-        MeshBuilder,
-        Mesh,
-        spritebatch::SpriteBatch,
+        self, spritebatch::SpriteBatch, Color, DrawMode, DrawParam, Mesh, MeshBuilder, Point2,
     },
-    event::{
-        self,
-        Keycode,
-        Mod,
-        MouseState,
-        MouseButton,
-    },
+    timer, Context, GameResult,
 };
-
-// struct DrawData {
-//     state: DrawState,
-//     origin: Point2,
-//     turnaround_index
-// }
+use std::{env, path};
 
 enum DrawState {
-    NotHolding,
-    Nocking(Point2), //origin
-    Drawing(Point2, usize), //(origin, turnaround_index)
-    // Loosed(Point2, usize),
+    NotHolding,             // not drawn back
+    Nocking(Point2),        // origin
+    Drawing(Point2, usize), // origin, turnaround_index
 }
-impl DrawState {
-    // fn am_holding(&self) -> bool {
-    //     match self {
-    //         DrawState::NotHolding => false,
-    //         _ => true,
-    //     }
-    // }
-}
-
-// const DESIRED_FPS: u32 = 60;
-
-
-
-
 
 struct GameState {
     character_at: Point2,
     live_arrows: Vec<LiveArrow>,
-    dead_arrows: SpriteBatch,
     temp_usize: Vec<usize>,
     arrow_graphic: graphics::Image,
     mouse_pts: Vec<Point2>,
     draw_state: DrawState,
     spot_mesh: Mesh,
+    dead_arrows: SpriteBatch,
+    dead_arrow_shadows: SpriteBatch,
 }
 
+fn default_param() -> DrawParam {
+    graphics::DrawParam {
+        ..Default::default()
+    }
+}
 
 impl GameState {
-	pub fn new(ctx: &mut Context) -> GameResult<Self> {
-		Ok(Self {
+    pub fn new(ctx: &mut Context) -> GameResult<Self> {
+        Ok(Self {
             live_arrows: vec![],
             temp_usize: vec![],
             character_at: Point2::new(300., 200.),
@@ -91,50 +56,51 @@ impl GameState {
             arrow_graphic: graphics::Image::new(ctx, "/arrow.png")?,
             draw_state: DrawState::NotHolding,
             dead_arrows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
+            dead_arrow_shadows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
             spot_mesh: create_spot_mesh(ctx)?,
-		})
-	}
+        })
+    }
 
-	pub fn update_tick(&mut self) {
+    pub fn update_tick(&mut self) {
         for (i, mut arrow) in self.live_arrows.iter_mut().enumerate() {
             arrow.height += arrow.climb_momentum;
             if arrow.height <= 16. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
                 arrow.climb_momentum *= 3.0;
-                arrow.position = pt::add(arrow.position, pt::scale(arrow.momentum, 1.5));
+                // arrow.position = arrow.position + (arrow.momentum * 1.5);
+                arrow.position = arrow.position.add(arrow.momentum * 1.5);
+                // arrow.position = pt::add(arrow.position, pt::scale(arrow.momentum, 1.5));
                 let param = graphics::DrawParam {
-                    dest: Point2::new(arrow.position[0], arrow.position[1]-arrow.height),
+                    dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
                     rotation: arrow.image_angle(),
                     scale: Point2::new(arrow.image_draw_length(), 1.),
                     ..Default::default()
                 };
                 self.dead_arrows.add(param);
             } else {
-                arrow.position = pt::add(arrow.position, arrow.momentum);
-                arrow.climb_momentum -= GRAVITY;//(-1.0_f32).max(arrow.climb_momentum-0.1);
+                arrow.position = arrow.position.add(arrow.momentum);
+                arrow.climb_momentum -= GRAVITY; //(-1.0_f32).max(arrow.climb_momentum-0.1);
             }
         }
         for index in self.temp_usize.drain(..).rev() {
             self.live_arrows.remove(index);
         }
-	}
-
-    // pub fn am_clicking(&self) -> bool {
-    //     self.draw_state.am_holding()
-    // }
-
-
+    }
 
     fn draw_point_prop(&self, prop: f32) -> Option<Point2> {
-        if prop < 0.0 {return None}
-        let index = ((self.mouse_pts.len()-1) as f32 * prop) as usize;
+        if prop < 0.0 {
+            return None;
+        }
+        let index = ((self.mouse_pts.len() - 1) as f32 * prop) as usize;
         self.draw_point_abs(index)
     }
 
     fn draw_point_abs(&self, index: usize) -> Option<Point2> {
         if index < self.mouse_pts.len() {
             return Some(self.mouse_pts[index]);
-        } else { None }
+        } else {
+            None
+        }
     }
 }
 
@@ -144,23 +110,15 @@ fn create_spot_mesh(ctx: &mut Context) -> GameResult<Mesh> {
         .build(ctx)
 }
 
-
 impl event::EventHandler for GameState {
-	fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         while timer::check_update_time(ctx, DESIRED_UPS) {
-        	self.update_tick();
-
+            self.update_tick();
         }
         Ok(())
     }
 
-    fn mouse_button_down_event(
-        &mut self, 
-        _ctx: &mut Context, 
-        button: MouseButton, 
-        x: i32, 
-        y: i32
-    ) {
+    fn mouse_button_down_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
         if button != MouseButton::Left {
             return;
         }
@@ -169,42 +127,40 @@ impl event::EventHandler for GameState {
         self.draw_state = DrawState::Nocking(origin);
     }
 
-    fn mouse_button_up_event(
-        &mut self, 
-        _ctx: &mut Context, 
-        button: MouseButton, 
-        x: i32, 
-        y: i32
-    ) {
-
+    fn mouse_button_up_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
         if button != MouseButton::Left {
             return;
         }
-        //println!("mouse up x:{} y:{}, button:{:?}", x, y, button);
+
         if let DrawState::Drawing(origin, turnaround_index) = self.draw_state {
             if turnaround_index < self.mouse_pts.len() - 1 {
                 let end = Point2::new(x as f32, y as f32);
                 let nock = self.mouse_pts[turnaround_index];
-                let len_on = pt::dist(origin, nock);
-                let len_ne = pt::dist(end, nock);
-                let len_oe = pt::dist(origin, end);
-                let pt_x = self.draw_point_prop(0.3).unwrap(); 
-                let pt_y = self.draw_point_prop(0.6).unwrap();  
-                let len_xn = pt::dist(pt_x, nock);  
-                let len_ny = pt::dist(pt_y, nock); 
-                let len_ye = pt::dist(pt_y, end);   
-                println!("Loosed arrow!. on:{} ne:{} oe:{} xn:{}", len_on, len_ne, len_oe, len_xn);
+                let len_on = origin.dist(nock);
+                let len_ne = end.dist(nock);
+                let len_oe = origin.dist(end);
+                let pt_x = self.draw_point_prop(0.3).unwrap();
+                let pt_y = self.draw_point_prop(0.6).unwrap();
+                let len_xn = pt_x.dist(nock);
+                let len_ny = pt_y.dist(nock);
+                let len_ye = pt_y.dist(end);
+                println!(
+                    "Loosed arrow!. on:{} ne:{} oe:{} xn:{}",
+                    len_on, len_ne, len_oe, len_xn
+                );
                 let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
 
-                let umph = 30.0 * len_ne / (len_oe + len_ne + len_on) ;
+                let umph = 30.0 * len_ne / (len_oe + len_ne + len_on);
                 let t = turnaround_index as f32;
 
-                let theta = (std::f32::consts::PI * 0.5)
-                / (1.0 + 5.0*(
+                let theta = (PI * 0.5)
+                    / (1.0
+                        + 5.0
+                            * (
                     (t / len_on) / ((l-t) / len_ne) // >1 if after turnaround index is WINDIER
                 )); // closer to Pi/2 when 2nd section of line is WINDIER than first
-                //"windiness" = length / num points
+                    //"windiness" = length / num points
 
                 let pitch = umph * theta.sin();
                 let speed = umph * theta.cos();
@@ -215,15 +171,8 @@ impl event::EventHandler for GameState {
                 );
 
                 let new_arrow = LiveArrow::new(self.character_at, mom, pitch);
-                
-                println!("ANGLE IS {}", pt::rotation(mom));
-                // let new_arrow = LiveArrow {
-                //     position: self.character_at,
-                //     momentum: mom,
-                //     angle: pt::rotation(mom),
-                //     height: 10.0,
-                //     climb_momentum: pitch, 
-                // };
+
+                println!("ANGLE IS {}", mom.rotation());
                 self.live_arrows.push(new_arrow);
             }
         }
@@ -232,37 +181,35 @@ impl event::EventHandler for GameState {
     }
 
     fn mouse_motion_event(
-        &mut self, 
-        _ctx: &mut Context, 
-        _state: MouseState, 
-        x: i32, 
-        y: i32, 
-        _xrel: i32, 
-        _yrel: i32
+        &mut self,
+        _ctx: &mut Context,
+        _state: MouseState,
+        x: i32,
+        y: i32,
+        _xrel: i32,
+        _yrel: i32,
     ) {
         //println!("mouse move <{},{}>  rel:<{},{}>", x, y, xrel, yrel);
         match self.draw_state {
-            DrawState::NotHolding => {
-                // pass
-            },
+            DrawState::NotHolding => {}
             DrawState::Nocking(origin) => {
                 let pt = Point2::new(x as f32, y as f32);
 
-                if ! self.mouse_pts.is_empty() {
-                    let pt_index = self.mouse_pts.len()-1;
+                if !self.mouse_pts.is_empty() {
+                    let pt_index = self.mouse_pts.len() - 1;
                     let prev_pt = self.mouse_pts[pt_index];
-                    let p_dist = pt::dist(origin, prev_pt);
-                    if p_dist > 30. && p_dist > pt::dist(origin, pt) {
+                    let p_dist = origin.dist(prev_pt);
+                    if p_dist > 30. && p_dist > origin.dist(pt) {
                         // getting closer to origin
                         self.draw_state = DrawState::Drawing(origin, pt_index);
                     }
                 }
                 self.mouse_pts.push(pt);
-            },
+            }
             DrawState::Drawing(_origin, _turnaround_index) => {
                 let pt = Point2::new(x as f32, y as f32);
-                self.mouse_pts.push(pt);    
-            },
+                self.mouse_pts.push(pt);
+            }
         }
     }
 
@@ -274,7 +221,6 @@ impl event::EventHandler for GameState {
             _ => (),
         }
     }
-
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
@@ -295,33 +241,31 @@ impl event::EventHandler for GameState {
         graphics::set_color(ctx, graphics::WHITE)?;
         for arrow in self.live_arrows.iter() {
             let param = graphics::DrawParam {
-                dest: Point2::new(arrow.position[0], arrow.position[1]-arrow.height),
+                dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
                 rotation: arrow.image_angle(),
                 scale: Point2::new(arrow.image_draw_length(), 1.),
                 ..Default::default()
             };
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
-        let param = graphics::DrawParam {
-            ..Default::default()
-        };
-        graphics::draw_ex(ctx, &self.dead_arrows, param)?;
+
+        graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
 
         //ui
         if self.mouse_pts.len() > 1 {
             match self.draw_state {
                 DrawState::NotHolding => {
                     //pass
-                },
+                }
                 DrawState::Nocking(_origin) => {
                     graphics::set_color(ctx, utils::red())?;
                     graphics::line(ctx, &self.mouse_pts, 3.0)?;
-                },
+                }
                 DrawState::Drawing(_origin, turnaround_index) => {
                     graphics::set_color(ctx, utils::red())?;
                     graphics::line(ctx, &self.mouse_pts[..turnaround_index], 3.0)?;
                     graphics::set_color(ctx, utils::green())?;
-                    graphics::line(ctx, &self.mouse_pts[turnaround_index-1..], 3.0)?;
+                    graphics::line(ctx, &self.mouse_pts[turnaround_index - 1..], 3.0)?;
 
                     graphics::set_color(ctx, graphics::WHITE)?;
                     if let Some(point) = self.draw_point_prop(0.3) {
@@ -338,10 +282,10 @@ impl event::EventHandler for GameState {
                         // };
                         graphics::draw(ctx, &self.spot_mesh, point, 0.0)?;
                     }
-                },
+                }
             }
         }
-        
+
         graphics::present(ctx);
         timer::yield_now();
         Ok(())
