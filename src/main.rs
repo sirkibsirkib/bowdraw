@@ -3,6 +3,16 @@ extern crate ggez;
 extern crate fnv;
 extern crate rand;
 
+mod consts;
+use ::consts::*;
+
+mod arrow;
+mod utils;
+use ::utils::{
+    pt,
+};
+use arrow::LiveArrow;
+
 use std::{
 	// thread,
 	// time,
@@ -53,98 +63,11 @@ impl DrawState {
     // }
 }
 
-const DESIRED_UPS: u32 = 60;
-const GRAVITY: f32 = 0.5;
 // const DESIRED_FPS: u32 = 60;
 
 
 
 
-struct LiveArrow {
-    position: Point2,
-    angle: f32,
-    momentum: Point2,
-    height: f32,
-    climb_momentum: f32, 
-}
-impl LiveArrow {
-
-    fn shadow_draw_length(&self) -> f32 {
-        let pi = std::f32::consts::PI;
-        let x = self._vert_draw_ratio().abs();
-        let y = ((x*pi).cos()+1.)/2.;
-        let val = (0.7*y + 0.2);
-        val*0.3*self.momentum[0].abs()/offset_pt(self.momentum) + 0.7*val
-    }
-
-    // returns 1.0 when arrow is shot straight up, -1.0 when shot straight down
-    fn _vert_draw_ratio(&self) -> f32 {
-        let x = self.angle.sin();
-        let hyp = self.climb_momentum.hypot(offset_pt(self.momentum));
-        let climb_ratio = self.climb_momentum / hyp;
-        let x_influence = 0.5 + 0.5*x.abs();
-        x_influence*climb_ratio
-    }
-
-    fn image_draw_length(&self) -> f32 {
-        let rat = self._vert_draw_ratio();
-        let angle_effect = self.angle.sin();
-        let pitch_effet = if angle_effect < 0. {
-            //toward camera
-            (0.5-rat).abs()
-        } else  {
-            //away from camera
-            (-0.5-rat).abs()
-        };
-        let effect = angle_effect*pitch_effet;
-        let val = effect*1.0 + (1.-effect)*0.7;
-        // println!("angle:{}\tangeff:{}\tpitcheff:{}\teffect:{}\tval:{}", self.angle, angle_effect, pitch_effet, effect, val);
-        val
-    }
-
-    fn image_angle(&self) -> f32 {
-        let pi = std::f32::consts::PI;
-        let mut ratio = self._vert_draw_ratio();
-        let val = if ratio > 0. {
-            // skew UPWARD
-
-            //ensure shortest distance around the clock is in phase
-            let n = if self.angle > pi/2. {
-                //positive
-                self.angle - pi*2.
-            } else {
-                //negative
-                self.angle
-            };
-            // print!("angle:{}\tup:{}\t+ normal:{}\tn:{}", self.angle, ratio, 1.-ratio, n);
-            (-pi/2./*UP*/)*ratio + n*(1.-ratio)
-
-        } else {
-            ratio *= -1.;
-            // skew DOWNWARD
-
-            //ensure shortest distance around the clock is in phase
-            let n = if self.angle < -pi/2. {
-                //positive
-                self.angle + pi*2.
-                // self.angle
-            } else {
-                //negative
-                self.angle
-            };
-            // assert!(n >= 0.);
-            // print!("angle:{}\tdown:{}\t+ normal:{}\tn:{}", self.angle, ratio, 1.-ratio, n);
-
-            (pi/2./*DOWN*/)*ratio + n*(1.-ratio)
-        };
-        // println!("\tval:{}", val);
-        val
-        // selsf.angle
-    }
-    fn shadow_angle(&self) -> f32 {
-        self.angle
-    }
-}
 
 struct GameState {
     character_at: Point2,
@@ -157,27 +80,6 @@ struct GameState {
     spot_mesh: Mesh,
 }
 
-macro_rules! sqr {
-    ($x:expr) => ($x*$x)
-}
-
-fn dist(a: Point2, b: Point2) -> f32 {
-    offset_pt(sub_pts(a, b))
-}
-
-fn offset_pt(p: Point2) -> f32 {
-    (
-        sqr!(p[0]) + sqr!(p[1])
-    ).sqrt()
-}
-
-fn sub_pts(a: Point2, b: Point2) -> Point2 {
-    Point2::new(a[0]-b[0], a[1]-b[1])
-}
-
-fn add_pts(a: Point2, b: Point2) -> Point2 {
-    Point2::new(a[0]+b[0], a[1]+b[1])
-}
 
 impl GameState {
 	pub fn new(ctx: &mut Context) -> GameResult<Self> {
@@ -199,7 +101,7 @@ impl GameState {
             if arrow.height <= 16. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
                 arrow.climb_momentum *= 3.0;
-                arrow.position = add_pts(arrow.position, scale_pt(arrow.momentum, 1.5));
+                arrow.position = pt::add(arrow.position, pt::scale(arrow.momentum, 1.5));
                 let param = graphics::DrawParam {
                     dest: Point2::new(arrow.position[0], arrow.position[1]-arrow.height),
                     rotation: arrow.image_angle(),
@@ -208,7 +110,7 @@ impl GameState {
                 };
                 self.dead_arrows.add(param);
             } else {
-                arrow.position = add_pts(arrow.position, arrow.momentum);
+                arrow.position = pt::add(arrow.position, arrow.momentum);
                 arrow.climb_momentum -= GRAVITY;//(-1.0_f32).max(arrow.climb_momentum-0.1);
             }
         }
@@ -242,22 +144,6 @@ fn create_spot_mesh(ctx: &mut Context) -> GameResult<Mesh> {
         .build(ctx)
 }
 
-fn green() -> Color {Color::new(0., 1., 0., 1.)}
-fn red() -> Color {Color::new(1., 0., 0., 1.)}
-fn blue() -> Color {Color::new(0., 0., 1., 1.)}
-
-fn calc_rotation(pt: Point2) -> f32 {
-    pt[1].atan2(pt[0])
-}
-
-fn scale_pt(p: Point2, scalar: f32) -> Point2 {
-    Point2::new(p[0]*scalar, p[1]*scalar)
-}
-
-fn shoot_get_1d_velocity(distance: f32, theta: f32) -> f32 {
-    let x = distance * GRAVITY / (theta * 2.0).sin();
-    x.sqrt()
-}
 
 impl event::EventHandler for GameState {
 	fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
@@ -299,14 +185,14 @@ impl event::EventHandler for GameState {
             if turnaround_index < self.mouse_pts.len() - 1 {
                 let end = Point2::new(x as f32, y as f32);
                 let nock = self.mouse_pts[turnaround_index];
-                let len_on = dist(origin, nock);
-                let len_ne = dist(end, nock);
-                let len_oe = dist(origin, end);
+                let len_on = pt::dist(origin, nock);
+                let len_ne = pt::dist(end, nock);
+                let len_oe = pt::dist(origin, end);
                 let pt_x = self.draw_point_prop(0.3).unwrap(); 
                 let pt_y = self.draw_point_prop(0.6).unwrap();  
-                let len_xn = dist(pt_x, nock);  
-                let len_ny = dist(pt_y, nock); 
-                let len_ye = dist(pt_y, end);   
+                let len_xn = pt::dist(pt_x, nock);  
+                let len_ny = pt::dist(pt_y, nock); 
+                let len_ye = pt::dist(pt_y, end);   
                 println!("Loosed arrow!. on:{} ne:{} oe:{} xn:{}", len_on, len_ne, len_oe, len_xn);
                 let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
@@ -316,8 +202,9 @@ impl event::EventHandler for GameState {
 
                 let theta = (std::f32::consts::PI * 0.5)
                 / (1.0 + 5.0*(
-                    (t / len_on) / ((l-t) / len_ne)
-                ));
+                    (t / len_on) / ((l-t) / len_ne) // >1 if after turnaround index is WINDIER
+                )); // closer to Pi/2 when 2nd section of line is WINDIER than first
+                //"windiness" = length / num points
 
                 let pitch = umph * theta.sin();
                 let speed = umph * theta.cos();
@@ -327,27 +214,16 @@ impl event::EventHandler for GameState {
                     speed * (nock[1] - end[1]) / len_ne,
                 );
 
-                // println!("power:{} pitch:{} speed:{}", power, pitch, speed);
-                // let mom = scale_pt(Point2::new(nock[0] - end[0], nock[1] - end[1]), speed);
-
-
-                // let dx = (end[0] - self.character_at[0]).abs();
-                // //let dy = (end[1] - self.character_at[1]).abs();
-                // let angle = 0.4;
-                // let tot_speed = shoot_get_1d_velocity(dx, angle);
-                // let mom = Point2::new(tot_speed*angle.cos(), 0.);
-                // let pitch = tot_speed*angle.sin();
-
-
+                let new_arrow = LiveArrow::new(self.character_at, mom, pitch);
                 
-                println!("ANGLE IS {}", calc_rotation(mom));
-                let new_arrow = LiveArrow {
-                    position: self.character_at,
-                    momentum: mom,
-                    angle: calc_rotation(mom),
-                    height: 10.0,
-                    climb_momentum: pitch, 
-                };
+                println!("ANGLE IS {}", pt::rotation(mom));
+                // let new_arrow = LiveArrow {
+                //     position: self.character_at,
+                //     momentum: mom,
+                //     angle: pt::rotation(mom),
+                //     height: 10.0,
+                //     climb_momentum: pitch, 
+                // };
                 self.live_arrows.push(new_arrow);
             }
         }
@@ -375,8 +251,8 @@ impl event::EventHandler for GameState {
                 if ! self.mouse_pts.is_empty() {
                     let pt_index = self.mouse_pts.len()-1;
                     let prev_pt = self.mouse_pts[pt_index];
-                    let p_dist = dist(origin, prev_pt);
-                    if p_dist > 30. && p_dist > dist(origin, pt) {
+                    let p_dist = pt::dist(origin, prev_pt);
+                    if p_dist > 30. && p_dist > pt::dist(origin, pt) {
                         // getting closer to origin
                         self.draw_state = DrawState::Drawing(origin, pt_index);
                     }
@@ -438,13 +314,13 @@ impl event::EventHandler for GameState {
                     //pass
                 },
                 DrawState::Nocking(_origin) => {
-                    graphics::set_color(ctx, red())?;
+                    graphics::set_color(ctx, utils::red())?;
                     graphics::line(ctx, &self.mouse_pts, 3.0)?;
                 },
                 DrawState::Drawing(_origin, turnaround_index) => {
-                    graphics::set_color(ctx, red())?;
+                    graphics::set_color(ctx, utils::red())?;
                     graphics::line(ctx, &self.mouse_pts[..turnaround_index], 3.0)?;
-                    graphics::set_color(ctx, green())?;
+                    graphics::set_color(ctx, utils::green())?;
                     graphics::line(ctx, &self.mouse_pts[turnaround_index-1..], 3.0)?;
 
                     graphics::set_color(ctx, graphics::WHITE)?;
