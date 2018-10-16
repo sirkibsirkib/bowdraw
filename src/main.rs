@@ -67,9 +67,13 @@ impl GameState {
             if arrow.height <= 16. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
                 arrow.climb_momentum *= 3.0;
-                // arrow.position = arrow.position + (arrow.momentum * 1.5);
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
-                // arrow.position = pt::add(arrow.position, pt::scale(arrow.momentum, 1.5));
+
+                TODO /*
+                    generalize these arrow draw param functions in main
+                    insert arrow here into dead_arrow_shadows
+                */
+
                 let param = graphics::DrawParam {
                     dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
                     rotation: arrow.image_angle(),
@@ -189,7 +193,6 @@ impl event::EventHandler for GameState {
         _xrel: i32,
         _yrel: i32,
     ) {
-        //println!("mouse move <{},{}>  rel:<{},{}>", x, y, xrel, yrel);
         match self.draw_state {
             DrawState::NotHolding => {}
             DrawState::Nocking(origin) => {
@@ -225,6 +228,12 @@ impl event::EventHandler for GameState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
 
+
+        graphics::set_color(ctx, graphics::BLACK)?;
+        graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
+        graphics::set_color(ctx, graphics::WHITE)?;
+        graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
+
         //arrow shadows
         graphics::set_color(ctx, graphics::BLACK)?;
         for arrow in self.live_arrows.iter() {
@@ -248,8 +257,6 @@ impl event::EventHandler for GameState {
             };
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
-
-        graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
 
         //ui
         if self.mouse_pts.len() > 1 {
@@ -276,10 +283,6 @@ impl event::EventHandler for GameState {
                         graphics::draw_ex(ctx, &self.spot_mesh, param)?;
                     }
                     if let Some(point) = self.draw_point_prop(0.6) {
-                        // let param = graphics::DrawParam {
-                        //     dest: point,
-                        //     ..Default::default()
-                        // };
                         graphics::draw(ctx, &self.spot_mesh, point, 0.0)?;
                     }
                 }

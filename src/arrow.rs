@@ -3,6 +3,7 @@ use std;
 
 use consts::*;
 use std::f32::consts::PI;
+use ggez::graphics::DrawParam;
 use utils::{self, PointArithmetic};
 
 //////////////////////////////////////////////////
