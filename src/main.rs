@@ -61,6 +61,24 @@ impl GameState {
         })
     }
 
+    fn param_image_arrow(arrow: &LiveArrow) -> DrawParam {
+        DrawParam {
+            dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
+            rotation: arrow.image_angle(),
+            scale: Point2::new(arrow.image_draw_length(), 1.),
+            ..Default::default()
+        }
+    }
+
+    fn param_shadow_arrow(arrow: &LiveArrow) -> DrawParam {
+        DrawParam {
+            dest: arrow.position,
+            rotation: arrow.angle,
+            scale: Point2::new(arrow.shadow_draw_length(), 1.0),
+            ..Default::default()
+        }
+    }
+
     pub fn update_tick(&mut self) {
         for (i, mut arrow) in self.live_arrows.iter_mut().enumerate() {
             arrow.height += arrow.climb_momentum;
@@ -68,19 +86,8 @@ impl GameState {
                 self.temp_usize.push(i);
                 arrow.climb_momentum *= 3.0;
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
-
-                TODO /*
-                    generalize these arrow draw param functions in main
-                    insert arrow here into dead_arrow_shadows
-                */
-
-                let param = graphics::DrawParam {
-                    dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
-                    rotation: arrow.image_angle(),
-                    scale: Point2::new(arrow.image_draw_length(), 1.),
-                    ..Default::default()
-                };
-                self.dead_arrows.add(param);
+                self.dead_arrows.add(Self::param_image_arrow(arrow));
+                self.dead_arrow_shadows.add(Self::param_shadow_arrow(arrow));
             } else {
                 arrow.position = arrow.position.add(arrow.momentum);
                 arrow.climb_momentum -= GRAVITY; //(-1.0_f32).max(arrow.climb_momentum-0.1);
@@ -228,7 +235,6 @@ impl event::EventHandler for GameState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
 
-
         graphics::set_color(ctx, graphics::BLACK)?;
         graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
         graphics::set_color(ctx, graphics::WHITE)?;
@@ -236,25 +242,13 @@ impl event::EventHandler for GameState {
 
         //arrow shadows
         graphics::set_color(ctx, graphics::BLACK)?;
-        for arrow in self.live_arrows.iter() {
-            let param = graphics::DrawParam {
-                dest: arrow.position,
-                rotation: arrow.angle,
-                scale: Point2::new(arrow.shadow_draw_length(), 1.0),
-                ..Default::default()
-            };
+        for param in self.live_arrows.iter().map(Self::param_shadow_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
 
         //arrows
         graphics::set_color(ctx, graphics::WHITE)?;
-        for arrow in self.live_arrows.iter() {
-            let param = graphics::DrawParam {
-                dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
-                rotation: arrow.image_angle(),
-                scale: Point2::new(arrow.image_draw_length(), 1.),
-                ..Default::default()
-            };
+        for param in self.live_arrows.iter().map(Self::param_image_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
 
@@ -273,6 +267,15 @@ impl event::EventHandler for GameState {
                     graphics::line(ctx, &self.mouse_pts[..turnaround_index], 3.0)?;
                     graphics::set_color(ctx, utils::green())?;
                     graphics::line(ctx, &self.mouse_pts[turnaround_index - 1..], 3.0)?;
+                    graphics::set_color(ctx, utils::blue())?;
+                    graphics::line(
+                        ctx,
+                        &[
+                            self.mouse_pts[turnaround_index],
+                            *self.mouse_pts.last().unwrap(),
+                        ],
+                        2.0,
+                    )?;
 
                     graphics::set_color(ctx, graphics::WHITE)?;
                     if let Some(point) = self.draw_point_prop(0.3) {
