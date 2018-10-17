@@ -1,0 +1,8 @@
+arrows:
+	- bouncy arrow
+	- super fast straight shot arrow
+	- grenade arrow
+	- split-in-three arrow
+
+movement:
+	- blink

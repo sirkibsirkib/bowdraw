@@ -1,0 +1,9 @@
+instrumentation:
+	- period-specific (i.e. medieval?)
+		> lute => guitar
+		> manodolin
+		> accordion / hurdy-gurdy => melodica
+		> gamba => d. bass
+
+tone:
+	- calm and background(y) as to not grate and to form silly juxtaposition to hectic gameplay
