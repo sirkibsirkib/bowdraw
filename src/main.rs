@@ -66,6 +66,7 @@ impl GameState {
             dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
             rotation: arrow.image_angle(),
             scale: Point2::new(arrow.image_draw_length(), 1.),
+            color: Some(color::WHITE),
             ..Default::default()
         }
     }
@@ -75,6 +76,7 @@ impl GameState {
             dest: arrow.position,
             rotation: arrow.angle,
             scale: Point2::new(arrow.shadow_draw_length(), 1.0),
+            color: Some(color::BLACK),
             ..Default::default()
         }
     }
@@ -235,19 +237,19 @@ impl event::EventHandler for GameState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx);
 
-        graphics::set_color(ctx, graphics::BLACK)?;
+        // graphics::set_color(ctx, graphics::BLACK)?;
         graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
-        graphics::set_color(ctx, graphics::WHITE)?;
+        // graphics::set_color(ctx, graphics::WHITE)?;
         graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
 
         //arrow shadows
-        graphics::set_color(ctx, graphics::BLACK)?;
+        // graphics::set_color(ctx, graphics::BLACK)?;
         for param in self.live_arrows.iter().map(Self::param_shadow_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
 
         //arrows
-        graphics::set_color(ctx, graphics::WHITE)?;
+        // graphics::set_color(ctx, graphics::WHITE)?;
         for param in self.live_arrows.iter().map(Self::param_image_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
