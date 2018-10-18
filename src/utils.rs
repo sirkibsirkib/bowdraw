@@ -28,7 +28,7 @@ fn shoot_get_1d_velocity(distance: f32, theta: f32) -> f32 {
     x.sqrt()
 }
 
-pub trait PointArithmetic {
+pub trait PointArithmetic: Sized {
     fn add(self, other: Self) -> Self;
     fn sub(self, other: Self) -> Self;
     fn rotation(self) -> f32;
@@ -53,45 +53,3 @@ impl PointArithmetic for Point2 {
         (sqr!(self[0]) + sqr!(self[1])).sqrt()
     }
 }
-
-// pub mod pt {
-//     use super::*;
-//     // pub type Point2 = ::nalgebra::Point2<f32>;
-
-//     // pub fn scale(p: Point2, scalar: f32) -> Point2 {
-//     //     Point2::new(p[0] * scalar, p[1] * scalar)
-//     // }
-
-//     pub fn rotation(pt: Point2) -> f32 {
-//         pt[1].atan2(pt[0])
-//     }
-
-//     pub fn dist(a: Point2, b: Point2) -> f32 {
-//         offset(sub(a, b))
-//     }
-
-//     pub fn offset(p: Point2) -> f32 {
-//         (sqr!(p[0]) + sqr!(p[1])).sqrt()
-//     }
-
-//     pub fn sub(a: Point2, b: Point2) -> Point2 {
-//         Point2::new(a[0] - b[0], a[1] - b[1])
-//     }
-
-//     pub fn add(a: Point2, b: Point2) -> Point2 {
-//         Point2::new(a[0] + b[0], a[1] + b[1])
-//     }
-// }
-
-// struct Point2Wrapper(Point2);
-// impl std::convert::Into<Point2> for Point2Wrapper {
-//     fn into(self) -> Point2 {
-//         self.0
-//     }
-// }
-
-// impl std::convert::From<Point2> for Point2Wrapper {
-//     fn from(p: Point2) -> Self {
-//         Point2Wrapper(p)
-//     }
-// }

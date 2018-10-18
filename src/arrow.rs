@@ -26,6 +26,14 @@ impl LiveArrow {
         }
     }
 
+    fn normalized_climb(&self) -> f32 {
+        self.climb_momentum / self.total_momentum()
+    }
+
+    fn total_momentum(&self) -> f32 {
+        (sqr!(self.momentum[0]) + sqr!(self.momentum[0]) + sqr!(self.climb_momentum)).sqrt()
+    }
+
     pub fn shadow_draw_length(&self) -> f32 {
         let x = self._vert_draw_ratio().abs();
         let y = ((x * PI).cos() + 1.) / 2.;
@@ -43,19 +51,10 @@ impl LiveArrow {
     }
 
     pub fn image_draw_length(&self) -> f32 {
-        let rat = self._vert_draw_ratio();
-        let angle_effect = self.angle.sin();
-        let pitch_effet = if angle_effect < 0. {
-            //toward camera
-            (0.5 - rat).abs()
-        } else {
-            //away from camera
-            (-0.5 - rat).abs()
-        };
-        let effect = angle_effect * pitch_effet;
-        let val = effect * 1.0 + (1. - effect) * 0.7;
-        // println!("angle:{}\tangeff:{}\tpitcheff:{}\teffect:{}\tval:{}", self.angle, angle_effect, pitch_effet, effect, val);
-        val
+        //TODO REDO entirely
+        // let rat = self._vert_draw_ratio();
+        let max_len_at_norm_climb = { self.angle.cos() * 0.6 };
+        1. - (max_len_at_norm_climb - self.normalized_climb()).abs()
     }
 
     pub fn image_angle(&self) -> f32 {

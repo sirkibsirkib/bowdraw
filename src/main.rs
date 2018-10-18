@@ -5,10 +5,12 @@ extern crate rand;
 mod consts;
 use consts::*;
 
+#[macro_use]
+mod utils;
+
 use std::f32::consts::PI;
 
 mod arrow;
-mod utils;
 use arrow::LiveArrow;
 use utils::PointArithmetic;
 
@@ -28,6 +30,55 @@ enum DrawState {
     Drawing(Point2, usize), // origin, turnaround_index
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum DiscreteNotch {
+    Pos,
+    Neg,
+    Zero,
+}
+impl DiscreteNotch {
+    pub fn reset(&mut self) {
+        *self = DiscreteNotch::Zero;
+    }
+    pub fn mul(self, value: f32) -> f32 {
+        use DiscreteNotch::*;
+        match self {
+            Neg => -value,
+            Zero => 0.,
+            Pos => value,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct PressingState {
+    vertical: DiscreteNotch,
+    horizontal: DiscreteNotch,
+}
+impl PressingState {
+    pub fn new() -> Self {
+        PressingState {
+            vertical: DiscreteNotch::Zero,
+            horizontal: DiscreteNotch::Zero,
+        }
+    }
+    pub fn is_all_zero(&self) -> bool {
+        use DiscreteNotch::*;
+        if let (Zero, Zero) = (self.vertical, self.horizontal) {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+struct InputConfig {
+    up: Keycode,
+    down: Keycode,
+    left: Keycode,
+    right: Keycode,
+}
+
 struct GameState {
     character_at: Point2,
     live_arrows: Vec<LiveArrow>,
@@ -38,6 +89,8 @@ struct GameState {
     spot_mesh: Mesh,
     dead_arrows: SpriteBatch,
     dead_arrow_shadows: SpriteBatch,
+    pressing_state: PressingState,
+    input_config: InputConfig,
 }
 
 fn default_param() -> DrawParam {
@@ -51,13 +104,20 @@ impl GameState {
         Ok(Self {
             live_arrows: vec![],
             temp_usize: vec![],
-            character_at: Point2::new(300., 200.),
+            character_at: Point2::new(400., 300.),
             mouse_pts: vec![],
             arrow_graphic: graphics::Image::new(ctx, "/arrow.png")?,
             draw_state: DrawState::NotHolding,
             dead_arrows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
             dead_arrow_shadows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
             spot_mesh: create_spot_mesh(ctx)?,
+            pressing_state: PressingState::new(),
+            input_config: InputConfig {
+                up: Keycode::W,
+                down: Keycode::S,
+                left: Keycode::A,
+                right: Keycode::D,
+            },
         })
     }
 
@@ -65,8 +125,9 @@ impl GameState {
         DrawParam {
             dest: Point2::new(arrow.position[0], arrow.position[1] - arrow.height),
             rotation: arrow.image_angle(),
+            offset: Point2::new(1.0, 0.5),
             scale: Point2::new(arrow.image_draw_length(), 1.),
-            color: Some(color::WHITE),
+            color: Some(ggez::graphics::WHITE),
             ..Default::default()
         }
     }
@@ -74,17 +135,41 @@ impl GameState {
     fn param_shadow_arrow(arrow: &LiveArrow) -> DrawParam {
         DrawParam {
             dest: arrow.position,
+            offset: Point2::new(1.0, 0.5),
             rotation: arrow.angle,
             scale: Point2::new(arrow.shadow_draw_length(), 1.0),
-            color: Some(color::BLACK),
+            color: Some(ggez::graphics::BLACK),
             ..Default::default()
         }
     }
 
     pub fn update_tick(&mut self) {
+        self.update_live_arrows();
+        self.update_character_pos();
+    }
+
+    fn update_character_pos(&mut self) {
+        if !self.pressing_state.is_all_zero() {
+            use DiscreteNotch::*;
+            let speed =
+                if self.pressing_state.vertical == Zero || self.pressing_state.horizontal == Zero {
+                    CHAR_MOV_SPEED
+                } else {
+                    CHAR_MOV_SPEED * (2.0_f32).sqrt()
+                };
+            let char_offset = Point2::new(
+                self.pressing_state.horizontal.mul(speed),
+                self.pressing_state.vertical.mul(speed),
+            );
+            self.character_at = self.character_at.add(char_offset);
+        }
+    }
+
+    fn update_live_arrows(&mut self) {
+        // update arr
         for (i, mut arrow) in self.live_arrows.iter_mut().enumerate() {
             arrow.height += arrow.climb_momentum;
-            if arrow.height <= 16. && arrow.climb_momentum < 0. {
+            if arrow.height <= 0. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
                 arrow.climb_momentum *= 3.0;
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
@@ -164,7 +249,7 @@ impl event::EventHandler for GameState {
                 let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
 
-                let umph = 30.0 * len_ne / (len_oe + len_ne + len_on);
+                let umph = 20.0 * len_ne / (len_oe + len_ne + len_on);
                 let t = turnaround_index as f32;
 
                 let theta = (PI * 0.5)
@@ -225,34 +310,68 @@ impl event::EventHandler for GameState {
         }
     }
 
+    fn key_up_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
+        println!("key press: {:?}", keycode);
+        match keycode {
+            x if x == self.input_config.up => {
+                if let DiscreteNotch::Neg = self.pressing_state.vertical {
+                    self.pressing_state.vertical.reset()
+                }
+            }
+            x if x == self.input_config.down => {
+                if let DiscreteNotch::Pos = self.pressing_state.vertical {
+                    self.pressing_state.vertical.reset()
+                }
+            }
+            x if x == self.input_config.left => {
+                if let DiscreteNotch::Neg = self.pressing_state.horizontal {
+                    self.pressing_state.horizontal.reset()
+                }
+            }
+            x if x == self.input_config.right => {
+                if let DiscreteNotch::Pos = self.pressing_state.horizontal {
+                    self.pressing_state.horizontal.reset()
+                }
+            }
+            _ => (),
+        }
+    }
+
     fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
         println!("key press: {:?}", keycode);
         match keycode {
             Keycode::Escape => ctx.quit().unwrap(),
-            Keycode::F4 => graphics::set_fullscreen(ctx, true).unwrap(),
+            Keycode::F4 => {
+                let was = graphics::is_fullscreen(ctx);
+                graphics::set_fullscreen(ctx, !was);
+            }
+            x if x == self.input_config.up => self.pressing_state.vertical = DiscreteNotch::Neg,
+            x if x == self.input_config.down => self.pressing_state.vertical = DiscreteNotch::Pos,
+            x if x == self.input_config.left => self.pressing_state.horizontal = DiscreteNotch::Neg,
+            x if x == self.input_config.right => {
+                self.pressing_state.horizontal = DiscreteNotch::Pos
+            }
             _ => (),
         }
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        //dead arrows
         graphics::clear(ctx);
-
-        // graphics::set_color(ctx, graphics::BLACK)?;
         graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
-        // graphics::set_color(ctx, graphics::WHITE)?;
         graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
 
-        //arrow shadows
-        // graphics::set_color(ctx, graphics::BLACK)?;
+        //live arrows
         for param in self.live_arrows.iter().map(Self::param_shadow_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
-
-        //arrows
-        // graphics::set_color(ctx, graphics::WHITE)?;
         for param in self.live_arrows.iter().map(Self::param_image_arrow) {
             graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
         }
+
+        //character
+        graphics::set_color(ctx, utils::blue())?;
+        graphics::draw(ctx, &self.spot_mesh, self.character_at, 0.0)?;
 
         //ui
         if self.mouse_pts.len() > 1 {
@@ -281,11 +400,7 @@ impl event::EventHandler for GameState {
 
                     graphics::set_color(ctx, graphics::WHITE)?;
                     if let Some(point) = self.draw_point_prop(0.3) {
-                        let param = graphics::DrawParam {
-                            dest: point,
-                            ..Default::default()
-                        };
-                        graphics::draw_ex(ctx, &self.spot_mesh, param)?;
+                        graphics::draw(ctx, &self.spot_mesh, point, 0.0)?;
                     }
                     if let Some(point) = self.draw_point_prop(0.6) {
                         graphics::draw(ctx, &self.spot_mesh, point, 0.0)?;
