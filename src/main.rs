@@ -17,9 +17,7 @@ use utils::PointArithmetic;
 use ggez::{
     conf,
     event::{self, Keycode, Mod, MouseButton, MouseState},
-    graphics::{
-        self, spritebatch::SpriteBatch, Color, DrawMode, DrawParam, Mesh, MeshBuilder, Point2,
-    },
+    graphics::{self, spritebatch::SpriteBatch, DrawMode, DrawParam, Mesh, MeshBuilder, Point2},
     timer, Context, GameResult,
 };
 use std::{env, path};
@@ -231,22 +229,24 @@ impl event::EventHandler for GameState {
         }
 
         if let DrawState::Drawing(origin, turnaround_index) = self.draw_state {
+            // Release an arrow!
+
             if turnaround_index < self.mouse_pts.len() - 1 {
                 let end = Point2::new(x as f32, y as f32);
                 let nock = self.mouse_pts[turnaround_index];
                 let len_on = origin.dist(nock);
                 let len_ne = end.dist(nock);
                 let len_oe = origin.dist(end);
-                let pt_x = self.draw_point_prop(0.3).unwrap();
-                let pt_y = self.draw_point_prop(0.6).unwrap();
-                let len_xn = pt_x.dist(nock);
-                let len_ny = pt_y.dist(nock);
-                let len_ye = pt_y.dist(end);
-                println!(
-                    "Loosed arrow!. on:{} ne:{} oe:{} xn:{}",
-                    len_on, len_ne, len_oe, len_xn
-                );
-                let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
+                // let pt_x = self.draw_point_prop(0.3).unwrap();
+                // let pt_y = self.draw_point_prop(0.6).unwrap();
+                // let len_xn = pt_x.dist(nock);
+                // let len_ny = pt_y.dist(nock);
+                // let len_ye = pt_y.dist(end);
+                // println!(
+                //     "Loosed arrow!. on:{} ne:{} oe:{} xn:{}",
+                //     len_on, len_ne, len_oe, len_xn
+                // );
+                // let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
 
                 let umph = 20.0 * len_ne / (len_oe + len_ne + len_on);
@@ -310,7 +310,7 @@ impl event::EventHandler for GameState {
         }
     }
 
-    fn key_up_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
+    fn key_up_event(&mut self, _ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
         println!("key press: {:?}", keycode);
         match keycode {
             x if x == self.input_config.up => {
@@ -343,7 +343,7 @@ impl event::EventHandler for GameState {
             Keycode::Escape => ctx.quit().unwrap(),
             Keycode::F4 => {
                 let was = graphics::is_fullscreen(ctx);
-                graphics::set_fullscreen(ctx, !was);
+                graphics::set_fullscreen(ctx, !was).expect("failed to set fullscreen");
             }
             x if x == self.input_config.up => self.pressing_state.vertical = DiscreteNotch::Neg,
             x if x == self.input_config.down => self.pressing_state.vertical = DiscreteNotch::Pos,

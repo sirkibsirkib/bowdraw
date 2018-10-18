@@ -2,9 +2,8 @@ use ggez::graphics::Point2;
 use std;
 
 use consts::*;
-use ggez::graphics::DrawParam;
 use std::f32::consts::PI;
-use utils::{self, PointArithmetic};
+use utils::PointArithmetic;
 
 //////////////////////////////////////////////////
 
@@ -37,7 +36,7 @@ impl LiveArrow {
     pub fn shadow_draw_length(&self) -> f32 {
         let x = self._vert_draw_ratio().abs();
         let y = ((x * PI).cos() + 1.) / 2.;
-        let val = (0.7 * y + 0.2);
+        let val = 0.7 * y + 0.2;
         val * 0.3 * self.momentum[0].abs() / self.momentum.offset() + 0.7 * val
     }
 

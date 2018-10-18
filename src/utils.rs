@@ -1,9 +1,5 @@
 use consts::*;
-use ggez::{
-    self,
-    graphics::{Color, Point2},
-};
-use std;
+use ggez::graphics::{Color, Point2};
 
 //////////////////////////////////////////////////
 
@@ -23,10 +19,10 @@ pub fn blue() -> Color {
     Color::new(0., 0., 1., 1.)
 }
 
-fn shoot_get_1d_velocity(distance: f32, theta: f32) -> f32 {
-    let x = distance * GRAVITY / (theta * 2.0).sin();
-    x.sqrt()
-}
+// fn shoot_get_1d_velocity(distance: f32, theta: f32) -> f32 {
+//     let x = distance * GRAVITY / (theta * 2.0).sin();
+//     x.sqrt()
+// }
 
 pub trait PointArithmetic: Sized {
     fn add(self, other: Self) -> Self;
