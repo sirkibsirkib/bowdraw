@@ -89,7 +89,7 @@ struct GameState {
     character_at: Point2,
     live_arrows: Vec<LiveArrow>,
     temp_usize: Vec<usize>,
-    arrow_graphic: graphics::Image,
+    // arrow_graphic: graphics::Image,
     mouse_pts: Vec<Point2>,
     draw_state: DrawState,
     spot_mesh: Mesh,
@@ -108,15 +108,15 @@ fn default_param() -> DrawParam {
 
 impl GameState {
     pub fn new(ctx: &mut Context) -> GameResult<Self> {
+        let assets = Assets::new(ctx)?;
         Ok(Self {
             live_arrows: vec![],
             temp_usize: vec![],
             character_at: Point2::new(400., 300.),
             mouse_pts: vec![],
-            arrow_graphic: graphics::Image::new(ctx, "/arrow.png")?,
             draw_state: DrawState::NotHolding,
-            dead_arrows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
-            dead_arrow_shadows: SpriteBatch::new(graphics::Image::new(ctx, "/dead_arrow.png")?),
+            dead_arrows: SpriteBatch::new(assets.i.dead_arrow.clone()),
+            dead_arrow_shadows: SpriteBatch::new(assets.i.dead_arrow.clone()),
             spot_mesh: create_spot_mesh(ctx)?,
             pressing_state: PressingState::new(),
             input_config: InputConfig {
@@ -125,7 +125,7 @@ impl GameState {
                 left: Keycode::A,
                 right: Keycode::D,
             },
-            assets: Assets::new(ctx)?,
+            assets,
         })
     }
 
@@ -179,7 +179,7 @@ impl GameState {
             arrow.height += arrow.climb_momentum;
             if arrow.height <= 0. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
-                arrow.climb_momentum *= 3.0;
+                // arrow.climb_momentum *= 3.0;
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
                 self.dead_arrows.add(Self::param_image_arrow(arrow));
                 self.dead_arrow_shadows.add(Self::param_shadow_arrow(arrow));
@@ -382,10 +382,10 @@ impl event::EventHandler for GameState {
 
         //live arrows
         for param in self.live_arrows.iter().map(Self::param_shadow_arrow) {
-            graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
+            graphics::draw_ex(ctx, &self.assets.i.arrow, param)?;
         }
         for param in self.live_arrows.iter().map(Self::param_image_arrow) {
-            graphics::draw_ex(ctx, &self.arrow_graphic, param)?;
+            graphics::draw_ex(ctx, &self.assets.i.arrow, param)?;
         }
 
         //character

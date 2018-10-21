@@ -3,7 +3,7 @@ use ggez::{
     conf,
     audio::{self, Source},
     event::{self, Keycode, Mod, MouseButton, MouseState},
-    graphics::{self, spritebatch::SpriteBatch, DrawMode, DrawParam, Mesh, MeshBuilder, Point2},
+    graphics::{self, Image},
     timer, Context, GameResult,
 };
 
@@ -23,12 +23,15 @@ impl Assets {
 
 ////////////////////////////////////////
 pub struct ImageAssets {
+	pub arrow: Image,
+	pub dead_arrow: Image,
 }
 
 impl ImageAssets {
 	fn new(ctx: &mut Context) -> GameResult<Self> {
 		Ok(Self{
-
+			arrow: Image::new(ctx, "/arrow.png")?,
+			dead_arrow: Image::new(ctx, "/dead_arrow.png")?,
 		})
 	}
 }
