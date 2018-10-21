@@ -2,25 +2,33 @@ extern crate fnv;
 extern crate ggez;
 extern crate rand;
 
+
+
+mod synchro;
 mod consts;
 use consts::*;
 
 #[macro_use]
 mod utils;
+use utils::PointArithmetic;
 
 use std::f32::consts::PI;
 
 mod arrow;
 use arrow::LiveArrow;
-use utils::PointArithmetic;
+
+mod assets;
+use assets::{Assets, SourceExtension};
 
 use ggez::{
     conf,
+    audio,
     event::{self, Keycode, Mod, MouseButton, MouseState},
     graphics::{self, spritebatch::SpriteBatch, DrawMode, DrawParam, Mesh, MeshBuilder, Point2},
     timer, Context, GameResult,
 };
 use std::{env, path};
+
 
 enum DrawState {
     NotHolding,             // not drawn back
@@ -89,6 +97,7 @@ struct GameState {
     dead_arrow_shadows: SpriteBatch,
     pressing_state: PressingState,
     input_config: InputConfig,
+    assets: Assets,
 }
 
 fn default_param() -> DrawParam {
@@ -116,6 +125,7 @@ impl GameState {
                 left: Keycode::A,
                 right: Keycode::D,
             },
+            assets: Assets::new(ctx)?,
         })
     }
 
@@ -271,6 +281,7 @@ impl event::EventHandler for GameState {
                 let new_arrow = LiveArrow::new(self.character_at, mom, pitch);
 
                 println!("ANGLE IS {}", mom.rotation());
+                        let x = self.assets.a.bowshot.play();
                 self.live_arrows.push(new_arrow);
             }
         }
@@ -297,13 +308,20 @@ impl event::EventHandler for GameState {
                     let prev_pt = self.mouse_pts[pt_index];
                     let p_dist = origin.dist(prev_pt);
                     if p_dist > 30. && p_dist > origin.dist(pt) {
-                        // getting closer to origin
+                        // getting closer to origin. switch to DRAWING
                         self.draw_state = DrawState::Drawing(origin, pt_index);
+                        // let y = self.assets.a.nock.play();
                     }
                 }
                 self.mouse_pts.push(pt);
             }
-            DrawState::Drawing(_origin, _turnaround_index) => {
+            DrawState::Drawing(origin, turnaround_index) => {
+                let pt = Point2::new(x as f32, y as f32);
+                let nockpt = self.mouse_pts[turnaround_index];
+                let nocklen = nockpt.dist(origin);
+                let drawlen = nockpt.dist(pt);
+                self.assets.a.bowdraw.set_volume(drawlen/(nocklen + drawlen));
+                self.assets.a.bowdraw.play_if_not_playing().unwrap();
                 let pt = Point2::new(x as f32, y as f32);
                 self.mouse_pts.push(pt);
             }
@@ -356,6 +374,7 @@ impl event::EventHandler for GameState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        // println!("playing: {:?}", self.sound_effects.draw.playing());
         //dead arrows
         graphics::clear(ctx);
         graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;

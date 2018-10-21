@@ -30,7 +30,7 @@ impl LiveArrow {
     }
 
     fn total_momentum(&self) -> f32 {
-        (sqr!(self.momentum[0]) + sqr!(self.momentum[0]) + sqr!(self.climb_momentum)).sqrt()
+        (sqr!(self.momentum[0]) + sqr!(self.momentum[1]) + sqr!(self.climb_momentum)).sqrt()
     }
 
     pub fn shadow_draw_length(&self) -> f32 {
@@ -53,7 +53,9 @@ impl LiveArrow {
         //TODO REDO entirely
         // let rat = self._vert_draw_ratio();
         let max_len_at_norm_climb = { self.angle.cos() * 0.6 };
-        1. - (max_len_at_norm_climb - self.normalized_climb()).abs()
+        let nclimb = self.normalized_climb();
+        println!("nclimb {:?}", nclimb);
+        1. - (max_len_at_norm_climb - nclimb).abs()
     }
 
     pub fn image_angle(&self) -> f32 {
