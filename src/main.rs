@@ -2,10 +2,8 @@ extern crate fnv;
 extern crate ggez;
 extern crate rand;
 
-
-
-mod synchro;
 mod consts;
+mod synchro;
 use consts::*;
 
 #[macro_use]
@@ -21,18 +19,16 @@ mod assets;
 use assets::{Assets, SourceExtension};
 
 use ggez::{
-    conf,
-    audio,
+    audio, conf,
     event::{self, Keycode, Mod, MouseButton, MouseState},
     graphics::{self, spritebatch::SpriteBatch, DrawMode, DrawParam, Mesh, MeshBuilder, Point2},
     timer, Context, GameResult,
 };
 use std::{env, path};
 
-
 enum DrawState {
     NotHolding,             // not drawn back
-    Nocking(Point2),        // origin
+    Nocking(Point2, bool),  // origin, clicked
     Drawing(Point2, usize), // origin, turnaround_index
 }
 
@@ -181,6 +177,7 @@ impl GameState {
                 self.temp_usize.push(i);
                 // arrow.climb_momentum *= 3.0;
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
+                self.assets.a.arrowthud.play().unwrap();
                 self.dead_arrows.add(Self::param_image_arrow(arrow));
                 self.dead_arrow_shadows.add(Self::param_shadow_arrow(arrow));
             } else {
@@ -230,7 +227,8 @@ impl event::EventHandler for GameState {
         }
         //println!("mouse down x:{} y:{}, button:{:?}", x, y, button);
         let origin = Point2::new(x as f32, y as f32);
-        self.draw_state = DrawState::Nocking(origin);
+        self.draw_state = DrawState::Nocking(origin, false);
+        self.assets.a.quiverdraw.play().unwrap();
     }
 
     fn mouse_button_up_event(&mut self, _ctx: &mut Context, button: MouseButton, x: i32, y: i32) {
@@ -259,7 +257,7 @@ impl event::EventHandler for GameState {
                 // let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
 
-                let umph = 20.0 * len_ne / (len_oe + len_ne + len_on);
+                let umph = 27.0 * len_ne / (len_oe + len_ne + len_on);
                 let t = turnaround_index as f32;
 
                 let theta = (PI * 0.5)
@@ -281,7 +279,7 @@ impl event::EventHandler for GameState {
                 let new_arrow = LiveArrow::new(self.character_at, mom, pitch);
 
                 println!("ANGLE IS {}", mom.rotation());
-                        let x = self.assets.a.bowshot.play();
+                let x = self.assets.a.bowshot.play();
                 self.live_arrows.push(new_arrow);
             }
         }
@@ -300,17 +298,23 @@ impl event::EventHandler for GameState {
     ) {
         match self.draw_state {
             DrawState::NotHolding => {}
-            DrawState::Nocking(origin) => {
+            DrawState::Nocking(origin, clicked) => {
                 let pt = Point2::new(x as f32, y as f32);
 
                 if !self.mouse_pts.is_empty() {
                     let pt_index = self.mouse_pts.len() - 1;
                     let prev_pt = self.mouse_pts[pt_index];
                     let p_dist = origin.dist(prev_pt);
-                    if p_dist > 30. && p_dist > origin.dist(pt) {
-                        // getting closer to origin. switch to DRAWING
-                        self.draw_state = DrawState::Drawing(origin, pt_index);
-                        // let y = self.assets.a.nock.play();
+
+                    if p_dist > 50. {
+                        if !clicked {
+                            self.draw_state = DrawState::Nocking(origin, true);
+                            self.assets.a.nock.play().unwrap();
+                        }
+                        if p_dist > origin.dist(pt) {
+                            // getting closer to origin. switch to DRAWING
+                            self.draw_state = DrawState::Drawing(origin, pt_index);
+                        }
                     }
                 }
                 self.mouse_pts.push(pt);
@@ -320,7 +324,10 @@ impl event::EventHandler for GameState {
                 let nockpt = self.mouse_pts[turnaround_index];
                 let nocklen = nockpt.dist(origin);
                 let drawlen = nockpt.dist(pt);
-                self.assets.a.bowdraw.set_volume(drawlen/(nocklen + drawlen));
+                self.assets
+                    .a
+                    .bowdraw
+                    .set_volume(drawlen / (nocklen + drawlen));
                 self.assets.a.bowdraw.play_if_not_playing().unwrap();
                 let pt = Point2::new(x as f32, y as f32);
                 self.mouse_pts.push(pt);
@@ -377,6 +384,8 @@ impl event::EventHandler for GameState {
         // println!("playing: {:?}", self.sound_effects.draw.playing());
         //dead arrows
         graphics::clear(ctx);
+        graphics::set_color(ctx, graphics::WHITE)?;
+        graphics::draw_ex(ctx, &self.assets.i.mario, DrawParam::default())?;
         graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
         graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
 
@@ -398,7 +407,7 @@ impl event::EventHandler for GameState {
                 DrawState::NotHolding => {
                     //pass
                 }
-                DrawState::Nocking(_origin) => {
+                DrawState::Nocking(_origin, _clicked) => {
                     graphics::set_color(ctx, utils::red())?;
                     graphics::line(ctx, &self.mouse_pts, 3.0)?;
                 }
