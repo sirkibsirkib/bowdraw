@@ -1,22 +1,18 @@
-extern crate fnv;
 extern crate ggez;
 extern crate rand;
 
 mod consts;
 mod synchro;
-use consts::*;
-
 #[macro_use]
 mod utils;
-use utils::PointArithmetic;
-
-use std::f32::consts::PI;
-
 mod arrow;
-use arrow::LiveArrow;
-
 mod assets;
+
+use arrow::LiveArrow;
 use assets::{Assets, SourceExtension};
+use consts::*;
+use std::f32::consts::PI;
+use utils::PointArithmetic;
 
 use ggez::{
     audio, conf,
@@ -108,11 +104,7 @@ struct GameState {
     last_move_tap: (Instant, AxiomaticDirection),
 }
 
-fn default_param() -> DrawParam {
-    graphics::DrawParam {
-        ..Default::default()
-    }
-}
+/////////////////////////////////////////////////////////////////////////////
 
 impl GameState {
     pub fn new(ctx: &mut Context) -> GameResult<Self> {
@@ -125,7 +117,7 @@ impl GameState {
             draw_state: DrawState::NotHolding,
             dead_arrows: SpriteBatch::new(assets.i.dead_arrow.clone()),
             dead_arrow_shadows: SpriteBatch::new(assets.i.dead_arrow.clone()),
-            spot_mesh: create_spot_mesh(ctx)?,
+            spot_mesh: Self::create_spot_mesh(ctx)?,
             pressing_state: PressingState::new(),
             input_config: InputConfig {
                 up: Keycode::W,
@@ -161,12 +153,12 @@ impl GameState {
         }
     }
 
-    pub fn update_tick(&mut self) {
-        self.update_live_arrows();
-        self.update_character_pos();
+    pub fn update_tick(&mut self, ctx: &mut Context) {
+        self.update_live_arrows(ctx);
+        self.update_character_pos(ctx);
     }
 
-    fn update_character_pos(&mut self) {
+    fn update_character_pos(&mut self, ctx: &mut Context) {
         if !self.pressing_state.is_all_zero() {
             use DiscreteNotch::*;
             let speed =
@@ -183,13 +175,14 @@ impl GameState {
         }
     }
 
-    fn update_live_arrows(&mut self) {
+    fn update_live_arrows(&mut self, ctx: &mut Context) {
         // update arr
         for (i, mut arrow) in self.live_arrows.iter_mut().enumerate() {
+            arrow.momentum *= ARROW_DRAG_MULT;;
             arrow.height += arrow.climb_momentum;
             if arrow.height <= 0. && arrow.climb_momentum < 0. {
                 self.temp_usize.push(i);
-                // arrow.climb_momentum *= 3.0;
+                arrow.momentum *= 0.5;
                 arrow.position = arrow.position.add(arrow.momentum * 1.5);
                 self.assets.a.arrowthud.play().unwrap();
                 self.dead_arrows.add(Self::param_image_arrow(arrow));
@@ -235,18 +228,18 @@ impl GameState {
         self.last_move_tap = (now, dir);
         double_tapped
     }
-}
 
-fn create_spot_mesh(ctx: &mut Context) -> GameResult<Mesh> {
-    MeshBuilder::new()
-        .circle(DrawMode::Fill, Point2::new(0., 0.), 5.0, 1.0)
-        .build(ctx)
+    fn create_spot_mesh(ctx: &mut Context) -> GameResult<Mesh> {
+        MeshBuilder::new()
+            .circle(DrawMode::Fill, Point2::new(0., 0.), 5.0, 1.0)
+            .build(ctx)
+    }
 }
 
 impl event::EventHandler for GameState {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         while timer::check_update_time(ctx, DESIRED_UPS) {
-            self.update_tick();
+            self.update_tick(ctx);
         }
         Ok(())
     }
@@ -275,19 +268,9 @@ impl event::EventHandler for GameState {
                 let len_on = origin.dist(nock);
                 let len_ne = end.dist(nock);
                 let len_oe = origin.dist(end);
-                // let pt_x = self.draw_point_prop(0.3).unwrap();
-                // let pt_y = self.draw_point_prop(0.6).unwrap();
-                // let len_xn = pt_x.dist(nock);
-                // let len_ny = pt_y.dist(nock);
-                // let len_ye = pt_y.dist(end);
-                // println!(
-                //     "Loosed arrow!. on:{} ne:{} oe:{} xn:{}",
-                //     len_on, len_ne, len_oe, len_xn
-                // );
-                // let power = (len_on + len_ne) / (8.0 * len_xn + len_on + len_ne);
                 let l = self.mouse_pts.len() as f32;
 
-                let umph = 27.0 * len_ne / (len_oe + len_ne + len_on);
+                let umph = ARROW_BASE_UMPH * len_ne / (len_oe + len_ne + len_on);
                 let t = turnaround_index as f32;
 
                 let theta = (PI * 0.5)
@@ -305,9 +288,7 @@ impl event::EventHandler for GameState {
                     speed * (nock[0] - end[0]) / len_ne,
                     speed * (nock[1] - end[1]) / len_ne,
                 );
-
                 let new_arrow = LiveArrow::new(self.character_at, mom, pitch);
-
                 println!("ANGLE IS {}", mom.rotation());
                 let x = self.assets.a.bowshot.play();
                 self.live_arrows.push(new_arrow);
@@ -428,9 +409,8 @@ impl event::EventHandler for GameState {
         //dead arrows
         graphics::clear(ctx);
         graphics::set_color(ctx, graphics::WHITE)?;
-        graphics::draw_ex(ctx, &self.assets.i.mario, DrawParam::default())?;
-        graphics::draw_ex(ctx, &self.dead_arrow_shadows, default_param())?;
-        graphics::draw_ex(ctx, &self.dead_arrows, default_param())?;
+        graphics::draw_ex(ctx, &self.dead_arrow_shadows, DrawParam::default())?;
+        graphics::draw_ex(ctx, &self.dead_arrows, DrawParam::default())?;
 
         //live arrows
         for param in self.live_arrows.iter().map(Self::param_shadow_arrow) {

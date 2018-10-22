@@ -1,8 +1,7 @@
 use ggez::{
     audio::{self, Source},
-    conf,
-    event::{self, Keycode, Mod, MouseButton, MouseState},
-    graphics::{self, Image},
+    conf, graphics,
+    graphics::Image,
     timer, Context, GameResult,
 };
 
@@ -24,21 +23,13 @@ impl Assets {
 pub struct ImageAssets {
     pub arrow: Image,
     pub dead_arrow: Image,
-    pub mario: Image,
 }
 
 impl ImageAssets {
     fn new(ctx: &mut Context) -> GameResult<Self> {
-        let mario = Image::new(ctx, "/mario.png")?;
-        let mut mario_tl = split_spritesheet(ctx, &mario, [16, 16])?;
-        let x = mario_tl.0.drain(..).next().unwrap();
-        println!("Mario: {:?}", &x);
-
         Ok(Self {
             arrow: Image::new(ctx, "/arrow.png")?,
             dead_arrow: Image::new(ctx, "/dead_arrow.png")?,
-            mario: x,
-            // mario
         })
     }
 }
@@ -93,6 +84,12 @@ fn split_spritesheet(
             sprite_dims, img
         );
     }
+    graphics::clear(ctx);
+    graphics::clear(ctx);
+    graphics::clear(ctx);
+    graphics::clear(ctx);
+    graphics::clear(ctx);
+    graphics::clear(ctx);
     let sprite_data = img.to_rgba8(ctx)?;
     println!("SPRITE DATA {:?}", &sprite_data);
     let mut bytebuf = Vec::new();
