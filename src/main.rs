@@ -24,7 +24,10 @@ use ggez::{
     graphics::{self, spritebatch::SpriteBatch, DrawMode, DrawParam, Mesh, MeshBuilder, Point2},
     timer, Context, GameResult,
 };
-use std::{env, path};
+use std::{
+    env, path,
+    time::{Duration, Instant},
+};
 
 enum DrawState {
     NotHolding,             // not drawn back
@@ -52,6 +55,13 @@ impl DiscreteNotch {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum AxiomaticDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
 #[derive(Copy, Clone, Debug)]
 struct PressingState {
     vertical: DiscreteNotch,
@@ -79,6 +89,7 @@ struct InputConfig {
     down: Keycode,
     left: Keycode,
     right: Keycode,
+    double_tap_window: Duration,
 }
 
 struct GameState {
@@ -94,6 +105,7 @@ struct GameState {
     pressing_state: PressingState,
     input_config: InputConfig,
     assets: Assets,
+    last_move_tap: (Instant, AxiomaticDirection),
 }
 
 fn default_param() -> DrawParam {
@@ -120,8 +132,10 @@ impl GameState {
                 down: Keycode::S,
                 left: Keycode::A,
                 right: Keycode::D,
+                double_tap_window: Duration::from_millis(250),
             },
             assets,
+            last_move_tap: (Instant::now(), AxiomaticDirection::Up),
         })
     }
 
@@ -204,6 +218,22 @@ impl GameState {
         } else {
             None
         }
+    }
+
+    // trigger each time you press a move direction key
+    // returns if it was a DOUBLE TAP
+    fn dir_tap(&mut self, dir: AxiomaticDirection) -> bool {
+        let now = Instant::now();
+        let double_tapped = if now - self.last_move_tap.0 <= self.input_config.double_tap_window
+            && self.last_move_tap.1 == dir
+        {
+            println!("double tap in dir: {:?}", dir);
+            true
+        } else {
+            false
+        };
+        self.last_move_tap = (now, dir);
+        double_tapped
     }
 }
 
@@ -362,7 +392,10 @@ impl event::EventHandler for GameState {
         }
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, _repeat: bool) {
+    fn key_down_event(&mut self, ctx: &mut Context, keycode: Keycode, _keymod: Mod, repeat: bool) {
+        if repeat {
+            return;
+        }
         println!("key press: {:?}", keycode);
         match keycode {
             Keycode::Escape => ctx.quit().unwrap(),
@@ -370,11 +403,21 @@ impl event::EventHandler for GameState {
                 let was = graphics::is_fullscreen(ctx);
                 graphics::set_fullscreen(ctx, !was).expect("failed to set fullscreen");
             }
-            x if x == self.input_config.up => self.pressing_state.vertical = DiscreteNotch::Neg,
-            x if x == self.input_config.down => self.pressing_state.vertical = DiscreteNotch::Pos,
-            x if x == self.input_config.left => self.pressing_state.horizontal = DiscreteNotch::Neg,
+            x if x == self.input_config.up => {
+                self.pressing_state.vertical = DiscreteNotch::Neg;
+                self.dir_tap(AxiomaticDirection::Up);
+            }
+            x if x == self.input_config.down => {
+                self.pressing_state.vertical = DiscreteNotch::Pos;
+                self.dir_tap(AxiomaticDirection::Down);
+            }
+            x if x == self.input_config.left => {
+                self.pressing_state.horizontal = DiscreteNotch::Neg;
+                self.dir_tap(AxiomaticDirection::Left);
+            }
             x if x == self.input_config.right => {
-                self.pressing_state.horizontal = DiscreteNotch::Pos
+                self.pressing_state.horizontal = DiscreteNotch::Pos;
+                self.dir_tap(AxiomaticDirection::Right);
             }
             _ => (),
         }
